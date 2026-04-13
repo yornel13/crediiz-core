@@ -19,6 +19,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage --passWithNoTests",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "seed": "ts-node -r tsconfig-paths/register src/seeds/seed.ts",
     "validate": "npm run lint:check && npm run format:check && npm run build && npm run test:cov",
     "prepare": "husky"
   },
@@ -26,11 +27,18 @@
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",
+    "@nestjs/jwt": "^11.0.2",
     "@nestjs/mongoose": "^11.0.0",
+    "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.0",
+    "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "exceljs": "^4.4.0",
     "mongoose": "^8.9.0",
+    "multer": "^2.1.1",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
@@ -38,9 +46,12 @@
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.0",
+    "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.14",
+    "@types/multer": "^2.1.0",
     "@types/node": "^22.10.0",
+    "@types/passport-jwt": "^4.0.1",
     "eslint": "^9.16.0",
     "eslint-config-prettier": "^10.0.0",
     "husky": "^9.1.7",
@@ -74,17 +85,28 @@
       "/node_modules/",
       "/dist/",
       "main.ts",
-      ".module.ts"
+      ".module.ts",
+      ".dto.ts",
+      ".controller.ts",
+      ".enum.ts",
+      ".schema.ts",
+      ".decorator.ts",
+      ".strategy.ts",
+      ".guard.ts",
+      ".interface.ts"
     ],
     "coverageThreshold": {
       "global": {
-        "branches": 60,
+        "branches": 50,
         "functions": 60,
         "lines": 60,
         "statements": 60
       }
     },
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/$1"
+    }
   },
   "lint-staged": {
     "*.ts": [

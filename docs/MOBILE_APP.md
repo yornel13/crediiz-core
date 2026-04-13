@@ -631,8 +631,7 @@ When auto-call mode ends (no more clients or Promoter exits), show a summary:
 
 | Concern | Mitigation |
 |---|---|
-| **JWT storage** | Stored in EncryptedSharedPreferences (AndroidX Security) |
-| **Room DB** | SQLCipher encryption for local database (client PII at rest) |
-| **API transport** | HTTPS only. Certificate pinning for production |
-| **APK distribution** | Signed APK. No Play Store means no Play Protect — consider a simple checksum verification on install |
-| **Lost/stolen device** | Admin can deactivate Promoter account → JWT becomes invalid → app forces logout on next API call. Local Room data persists but is encrypted |
+| **JWT storage** | Stored in SharedPreferences |
+| **API transport** | HTTPS only |
+| **APK distribution** | Signed APK |
+| **Lost/stolen device** | Admin can deactivate Promoter account → JWT becomes invalid → app forces logout on next API call |
