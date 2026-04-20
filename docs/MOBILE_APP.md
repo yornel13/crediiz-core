@@ -155,7 +155,7 @@ The app replaces the device's default phone app. This gives it:
 
 ### 5.3 Main Hub — Agenda Tab
 
-The Promoter's personal follow-up schedule. Replaces the old "Follow-Up List" concept.
+The Agent's personal follow-up schedule. Replaces the old "Follow-Up List" concept.
 
 - **Grouped by date**: Today, Tomorrow, This Week, Later.
 - Each entry shows:
@@ -172,14 +172,14 @@ The Promoter's personal follow-up schedule. Replaces the old "Follow-Up List" co
 
 - **Auto-call behavior toggle**:
   - `Auto-advance`: After a NO_ANSWER/BUSY outcome, auto-dial next client after 5-second countdown.
-  - `Manual-advance`: After any outcome, show next client and wait for Promoter to tap "Call".
-- **Account info**: Promoter name, email (read-only).
-- **Sync status**: Last sync timestamp, number of pending interactions + follow-ups.
+  - `Manual-advance`: After any outcome, show next client and wait for Agent to tap "Call".
+- **Account info**: Agent name, email (read-only).
+- **Sync status**: Last sync timestamp, number of pending interactions + notes + follow-ups.
 - **Force sync button**: Manually trigger sync of all pending data.
 
 ### 5.5 Pre-Call Screen
 
-Shown before dialing. Gives the Promoter context about the client.
+Shown before dialing. Gives the Agent context about the client.
 
 - **Client info card**: name, phone, extraData fields (company, address, etc.).
 - **Call history**: number of previous attempts, last outcome, last note (from denormalized Client fields).
@@ -227,7 +227,7 @@ The custom dialer UI shown during an active call. Since the app is the default d
 
 - Full-screen text field overlay on top of the call screen.
 - The call timer remains visible at the top.
-- Free-text input — the Promoter types observations while talking.
+- Free-text input — the Agent types observations while talking.
 - "Close" button hides the overlay (note content is preserved, not lost).
 - The note stays in memory until saved in Post-Call Screen.
 
@@ -275,8 +275,8 @@ Shown immediately after the call ends (detected via ConnectionService state chan
 - **Note field**: pre-filled with whatever was typed during the call. Still editable.
 - **Outcome selector**: exactly one must be selected before saving.
 - **Follow-up section**: appears ONLY when "Interested" is selected. Date, time, and reason are required.
-- **"Save & Next"**: saves interaction + follow-up locally → attempts sync → shows next client.
-- If **call failed due to network error**: the outcome `NO_ANSWER` is pre-selected but the Promoter can change it.
+- **"Save & Next"**: saves interaction + note + follow-up locally → attempts sync → shows next client.
+- If **call failed due to network error**: the outcome `NO_ANSWER` is pre-selected but the Agent can change it.
 - If **calling from Agenda** (follow-up call): the original follow-up is marked as COMPLETED on save. If Interested again, a NEW follow-up is created (reschedule).
 
 ---
@@ -292,12 +292,12 @@ Auto-call mode processes clients sequentially without returning to the list. Wor
 │                                                          │
 │  1. Show Pre-Call Screen (first client in queue)          │
 │         │                                                │
-│         │  Promoter taps "Call" (or auto-dials            │
+│         │  Agent taps "Call" (or auto-dials               │
 │         │  if continuing in auto-advance mode)            │
 │         ▼                                                │
 │  2. In-Call Screen                                       │
 │     - Timer running                                      │
-│     - Promoter can open Notes overlay                    │
+│     - Agent can open Notes overlay                       │
 │         │                                                │
 │         │  Call ends (any reason)                         │
 │         ▼                                                │
@@ -308,6 +308,7 @@ Auto-call mode processes clients sequentially without returning to the list. Wor
 │     - Tap "Save & Next"                                  │
 │         │                                                │
 │         ├── Interaction saved locally                     │
+│         ├── Note saved locally                            │
 │         ├── Follow-up saved locally (if applicable)       │
 │         ├── Sync attempted                               │
 │         │                                                │
@@ -322,13 +323,13 @@ Auto-call mode processes clients sequentially without returning to the list. Wor
 │     │                                     │              │
 │     │  If auto-advance OFF:               │              │
 │     │    Always show Pre-Call Screen      │              │
-│     │    Wait for Promoter to tap "Call"  │              │
+│     │    Wait for Agent to tap "Call"     │              │
 │     └─────────────────────────────────────┘              │
 │         │                                                │
 │         ▼                                                │
 │  5. Repeat from step 2                                   │
 │                                                          │
-│  EXIT: Promoter taps "Exit Auto-Call" at any point       │
+│  EXIT: Agent taps "Exit Auto-Call" at any point          │
 │  (available on Pre-Call and Post-Call screens)            │
 │                                                          │
 │  END: No more clients in queue → show summary +          │
@@ -403,8 +404,8 @@ When a call disconnects, the system provides a `DisconnectCause`. The app maps i
 
 | DisconnectCause | Suggested Outcome | Auto-select? |
 |---|---|---|
-| `LOCAL` (Promoter hung up) | None — Promoter chooses | No |
-| `REMOTE` (Client hung up) | None — Promoter chooses | No |
+| `LOCAL` (Agent hung up) | None — Agent chooses | No |
+| `REMOTE` (Client hung up) | None — Agent chooses | No |
 | `BUSY` | BUSY | Yes (pre-selected) |
 | `REJECTED` | NO_ANSWER | Yes (pre-selected) |
 | `ERROR` | NO_ANSWER | Yes (pre-selected) |
@@ -412,7 +413,7 @@ When a call disconnects, the system provides a `DisconnectCause`. The app maps i
 | `MISSED` | NO_ANSWER | Yes (pre-selected) |
 | `CANCELED` (rang but no answer) | NO_ANSWER | Yes (pre-selected) |
 
-> Pre-selected means the outcome chip is highlighted by default on the Post-Call Screen, but the Promoter can always change it.
+> Pre-selected means the outcome chip is highlighted by default on the Post-Call Screen, but the Agent can always change it.
 
 ---
 
@@ -432,12 +433,25 @@ When a call disconnects, the system provides a `DisconnectCause`. The app maps i
 │  │  - status         │  │  - callEndedAt         │             │
 │  │  - queueOrder     │  │  - durationSeconds     │             │
 │  │  - extraData      │  │  - outcome             │             │
-│  │  - callAttempts   │  │  - note                │             │
-│  │  - lastCalledAt   │  │  - disconnectCause     │             │
-│  │  - lastOutcome    │  │  - syncStatus          │             │
-│  │  - lastNote       │  │    (PENDING / SYNCED)   │             │
-│  └──────────────────┘  │  - deviceCreatedAt      │             │
-│                         └──────────────────────┘             │
+│  │  - callAttempts   │  │  - disconnectCause     │             │
+│  │  - lastCalledAt   │  │  - syncStatus          │             │
+│  │  - lastOutcome    │  │    (PENDING / SYNCED)   │             │
+│  │  - lastNote       │  │  - deviceCreatedAt      │             │
+│  └──────────────────┘  └──────────────────────┘             │
+│                                                              │
+│  ┌──────────────────────┐                                    │
+│  │  NoteEntity           │                                    │
+│  │  - mobileSyncId (PK)  │                                    │
+│  │  - clientId            │                                    │
+│  │  - interactionId       │  ← optional link to interaction   │
+│  │  - content             │                                    │
+│  │  - type (CALL /        │                                    │
+│  │    POST_CALL / MANUAL /│                                    │
+│  │    FOLLOW_UP)          │                                    │
+│  │  - syncStatus          │                                    │
+│  │    (PENDING / SYNCED)  │                                    │
+│  │  - deviceCreatedAt     │                                    │
+│  └──────────────────────┘                                    │
 │                                                              │
 │  ┌──────────────────────────┐                                │
 │  │  FollowUpEntity          │                                │
@@ -463,10 +477,10 @@ When a call disconnects, the system provides a `DisconnectCause`. The app maps i
 │                    SYNC TRIGGERS                           │
 │                                                           │
 │  1. After "Save & Next" on Post-Call Screen                │
-│     → Immediate attempt (interaction + follow-up)          │
+│     → Immediate attempt (interaction + note + follow-up)   │
 │                                                           │
 │  2. WorkManager periodic job (every 15-30 min)             │
-│     → Batch all PENDING interactions + follow-ups          │
+│     → Batch all PENDING interactions + notes + follow-ups  │
 │                                                           │
 │  3. Network connectivity restored                          │
 │     → WorkManager constraint triggers batch sync           │
@@ -482,6 +496,7 @@ When a call disconnects, the system provides a `DisconnectCause`. The app maps i
 Sync request: POST /api/sync/interactions
 Body: {
   interactions: [...],
+  notes: [...],
   followUps: [...],
   completedFollowUps: [...]
 }
@@ -543,14 +558,14 @@ When a follow-up is saved locally (whether synced or not), the app schedules a l
 One complete cycle from call to server:
 
 ```
-Step 1: Promoter taps "Call"
+Step 1: Agent taps "Call"
   → Generate mobileSyncId (UUID) for interaction
   → Record callStartedAt = now
   → Store in-memory: { mobileSyncId, clientId, callStartedAt }
 
 Step 2: Call connects
   → Start timer
-  → Promoter opens Notes, starts typing
+  → Agent opens Notes, starts typing
 
 Step 3: Call ends
   → Record callEndedAt = now
@@ -558,12 +573,13 @@ Step 3: Call ends
   → Capture disconnectCause
   → Navigate to Post-Call Screen
 
-Step 4: Promoter selects outcome + reviews note
+Step 4: Agent selects outcome + reviews note
   → If INTERESTED: fill follow-up form (date, time, reason)
   → Tap "Save & Next"
 
 Step 5: Save locally
   → Build InteractionEntity → INSERT into Room
+  → Build NoteEntity → INSERT into Room (with type based on context)
   → If INTERESTED:
     → Generate mobileSyncId (UUID) for follow-up
     → Build FollowUpEntity → INSERT into Room
@@ -575,6 +591,7 @@ Step 5: Save locally
 Step 6: Sync attempt
   → POST /api/sync/interactions with:
     - interaction
+    - note (if created)
     - follow-up (if created)
     - completedFollowUp (if applicable)
   → Success: mark all as SYNCED, refresh from server
@@ -590,21 +607,21 @@ Step 7: Navigate to next client
 | Scenario | Behavior |
 |---|---|
 | **Call fails immediately** (no signal) | Go to Post-Call, pre-select NO_ANSWER, duration = 0 |
-| **Call drops mid-conversation** | Go to Post-Call, note content preserved, Promoter chooses outcome |
+| **Call drops mid-conversation** | Go to Post-Call, note content preserved, Agent chooses outcome |
 | **App crashes during call** | On next launch, detect orphaned in-memory interaction (callStartedAt set, no callEndedAt). Show recovery dialog: "You had an active call with [Client]. What happened?" → Post-Call Screen |
 | **No clients left in queue** | Show "All clients called" summary with stats → return to Main Hub |
 | **Sync fails repeatedly** | Records accumulate locally with PENDING status. Settings tab shows count. WorkManager keeps retrying. No data is lost |
 | **Token expired** | API returns 401 → redirect to Login Screen. Pending data stays in Room, will sync after re-login |
 | **Client list changed on server** | On next refresh, Room DB updates. If a client was unassigned server-side, it disappears from local list. Pending interactions still sync normally |
 | **Follow-up cancelled server-side** | On next agenda refresh, the cancelled follow-up is removed from Room. Its local notification alarm is cancelled |
-| **Follow-up notification but no network** | Notification fires regardless of connectivity (it's local). Promoter can call from the Pre-Call Screen. Data syncs later |
+| **Follow-up notification but no network** | Notification fires regardless of connectivity (it's local). Agent can call from the Pre-Call Screen. Data syncs later |
 | **Multiple follow-ups for same client** | Each is a separate FollowUpEntity. Agenda shows all of them. Completing one doesn't affect others |
 
 ---
 
 ## 12. Auto-Call Session Summary
 
-When auto-call mode ends (no more clients or Promoter exits), show a summary:
+When auto-call mode ends (no more clients or Agent exits), show a summary:
 
 ```
 ┌─────────────────────────────────┐
@@ -634,4 +651,4 @@ When auto-call mode ends (no more clients or Promoter exits), show a summary:
 | **JWT storage** | Stored in SharedPreferences |
 | **API transport** | HTTPS only |
 | **APK distribution** | Signed APK |
-| **Lost/stolen device** | Admin can deactivate Promoter account → JWT becomes invalid → app forces logout on next API call |
+| **Lost/stolen device** | Admin can deactivate Agent account → JWT becomes invalid → app forces logout on next API call |

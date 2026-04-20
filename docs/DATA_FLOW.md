@@ -27,13 +27,13 @@
 │  3. Owner views client list (GET /api/clients)               │
 │         │                                                    │
 │         ▼                                                    │
-│  4. Owner selects clients → assigns to Promoter              │
+│  4. Owner selects clients → assigns to Agent                 │
 │     (PATCH /api/clients/assign)                              │
 │         │                                                    │
 │         ▼                                                    │
 │  ┌────────────────────────────────┐                          │
 │  │  Client Service                │                          │
-│  │  - Set assignedTo = promoterId │                          │
+│  │  - Set assignedTo = agentId    │                          │
 │  │  - Set assignedAt = now        │                          │
 │  │  - Set queueOrder per client   │                          │
 │  └────────────────────────────────┘                          │
@@ -42,13 +42,13 @@
 
 ---
 
-## 2. Promoter: Call Flow — Pending Client (Online)
+## 2. Agent: Call Flow — Pending Client (Online)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                    MOBILE APP (Android)                       │
 │                                                              │
-│  1. Promoter logs in (POST /api/auth/login)                  │
+│  1. Agent logs in (POST /api/auth/login)                     │
 │         │                                                    │
 │         ▼                                                    │
 │  2. App fetches assigned clients + agenda                    │
@@ -60,14 +60,14 @@
 │     (name, phone, extraData, callAttempts, lastOutcome)      │
 │         │                                                    │
 │         ▼                                                    │
-│  4. Promoter taps "Call" button                              │
+│  4. Agent taps "Call" button                                 │
 │     ┌─────────────────────────────┐                          │
 │     │ - Generate mobileSyncId     │                          │
 │     │ - Record callStartedAt      │                          │
 │     │ - Launch native dialer      │                          │
 │     └─────────────┬───────────────┘                          │
 │                   │                                          │
-│          (Promoter can open Notes and type during call)       │
+│          (Agent can open Notes and type during call)          │
 │                   │                                          │
 │                   ▼                                          │
 │  5. Call ends                                                │
@@ -91,6 +91,7 @@
 │                                      │                       │
 │                                      ▼                       │
 │                              Save interaction                │
+│                              + Save note                     │
 │                              + Save follow-up                │
 │                              + Advance to next               │
 │                                                              │
@@ -103,13 +104,13 @@
 
 ---
 
-## 3. Promoter: Call Flow — Follow-Up Client (from Agenda)
+## 3. Agent: Call Flow — Follow-Up Client (from Agenda)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                    MOBILE APP (Android)                       │
 │                                                              │
-│  1. Promoter opens Agenda tab                                │
+│  1. Agent opens Agenda tab                                   │
 │     Shows follow-ups grouped: Today, Tomorrow, This Week     │
 │         │                                                    │
 │         ▼                                                    │
@@ -117,7 +118,7 @@
 │     Pre-Call shows: client info + follow-up reason            │
 │         │                                                    │
 │         ▼                                                    │
-│  3. Promoter taps "Call" → same call flow as above           │
+│  3. Agent taps "Call" → same call flow as above              │
 │         │                                                    │
 │         ▼                                                    │
 │  4. Call ends → Post-Call Screen                             │
@@ -133,28 +134,29 @@
 │         └── Outcome = NO_ANSWER / BUSY                       │
 │             → Client stays INTERESTED                        │
 │             → Follow-up stays PENDING (not yet completed)    │
-│             → Promoter can reschedule or try later           │
+│             → Agent can reschedule or try later              │
 │                                                              │
-│  5. Sync: interaction + new follow-up (if any)               │
+│  5. Sync: interaction + notes + new follow-up (if any)       │
 │           + completed follow-up (if applicable)              │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. Promoter: Offline Sync Flow
+## 4. Agent: Offline Sync Flow
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                      OFFLINE SCENARIO                        │
 │                                                              │
-│  Promoter makes calls without internet.                      │
+│  Agent makes calls without internet.                         │
 │  The call flow works identically — all data saved locally.    │
 │         │                                                    │
 │         ▼                                                    │
 │  ┌────────────────────────────────┐                          │
 │  │  Local DB (Room)               │                          │
 │  │  - InteractionEntity (PENDING) │                          │
+│  │  - NoteEntity (PENDING)        │                          │
 │  │  - FollowUpEntity (PENDING)    │                          │
 │  │  - CompletedFollowUp (PENDING) │                          │
 │  └──────────────┬─────────────────┘                          │
@@ -172,6 +174,7 @@
 │  POST /api/sync/interactions                                 │
 │  Body: {                                                     │
 │    interactions: [...],                                      │
+│    notes: [...],                                             │
 │    followUps: [...],                                         │
 │    completedFollowUps: [...]                                 │
 │  }                                                           │
@@ -182,11 +185,13 @@
 │  │  Processing order:                     │                  │
 │  │  1. Insert interactions (dedup)        │                  │
 │  │     → Update client fields             │                  │
-│  │  2. Insert follow-ups (dedup)          │                  │
+│  │  2. Insert notes (dedup)               │                  │
+│  │     → Update client.lastNote           │                  │
+│  │  3. Insert follow-ups (dedup)          │                  │
 │  │     → Resolve interactionMobileSyncId  │                  │
-│  │  3. Complete follow-ups                │                  │
+│  │  4. Complete follow-ups                │                  │
 │  │     → Mark COMPLETED with timestamp    │                  │
-│  │  4. Return per-item results            │                  │
+│  │  5. Return per-item results            │                  │
 │  └────────────────────────────────────────┘                  │
 │                 │                                            │
 │                 ▼                                            │
@@ -207,7 +212,6 @@
 │    client.callAttempts++                                   │
 │    client.lastCalledAt = interaction.callStartedAt         │
 │    client.lastOutcome  = interaction.outcome               │
-│    client.lastNote     = interaction.note                  │
 │                                                            │
 │  STATUS TRANSITION:                                        │
 │    outcome = INTERESTED      → client.status = INTERESTED  │
@@ -216,9 +220,13 @@
 │    outcome = BUSY            → client.status = PENDING     │
 │    outcome = INVALID_NUMBER  → client.status = INVALID_NUM │
 ├────────────────────────────────────────────────────────────┤
+│  PER CREATED NOTE:                                         │
+│                                                            │
+│    client.lastNote = note.content  (via updateLastNote)    │
+├────────────────────────────────────────────────────────────┤
 │  PER CREATED FOLLOW-UP:                                    │
 │                                                            │
-│    followUp.promoterId    = from JWT                       │
+│    followUp.agentId       = from JWT                       │
 │    followUp.interactionId = resolved from                  │
 │                             interactionMobileSyncId        │
 ├────────────────────────────────────────────────────────────┤
@@ -229,7 +237,7 @@
 ├────────────────────────────────────────────────────────────┤
 │  ON CLIENT REASSIGNMENT (Owner action):                    │
 │                                                            │
-│    All PENDING follow-ups for old Promoter on this client: │
+│    All PENDING follow-ups for old Agent on this client:    │
 │      → status = CANCELLED                                  │
 │      → cancelledAt = now                                   │
 │      → cancelReason = "Client reassigned"                  │
@@ -245,26 +253,26 @@
 │                     OWNER PANEL (Web)                         │
 │                                                              │
 │  1. Owner views follow-ups                                   │
-│     (GET /api/follow-ups?promoterId=optional&status=PENDING) │
+│     (GET /api/follow-ups?agentId=optional&status=PENDING)    │
 │         │                                                    │
 │         ▼                                                    │
 │  ┌──────────────────────────────────────────────┐            │
 │  │  Follow-Up List (read-only)                  │            │
 │  │                                              │            │
-│  │  Promoter    Client         Scheduled    St  │            │
+│  │  Agent       Client         Scheduled    St  │            │
 │  │  ─────────── ────────────── ─────────── ──── │            │
 │  │  Juan Pérez  María González Apr 10 2pm  PEND │            │
 │  │  Juan Pérez  Pedro López    Apr 11 10am PEND │            │
 │  │  Ana Ruiz    Luis Herrera   Apr 10 4pm  COMP │            │
 │  │                                              │            │
-│  │  Filters: [Promoter ▼] [Status ▼] [Date ▼]  │            │
+│  │  Filters: [Agent ▼] [Status ▼] [Date ▼]     │            │
 │  └──────────────────────────────────────────────┘            │
 │                                                              │
-│  2. Owner can reassign a client to another Promoter          │
+│  2. Owner can reassign a client to another Agent             │
 │     (PATCH /api/clients/assign)                              │
-│     → Old Promoter's PENDING follow-ups for this client      │
+│     → Old Agent's PENDING follow-ups for this client         │
 │       are automatically CANCELLED                            │
-│     → New Promoter manages their own agenda                  │
+│     → New Agent manages their own agenda                     │
 │                                                              │
 │  3. Owner can mark client as CONVERTED                       │
 │     (PATCH /api/clients/:id/status)                          │
@@ -278,15 +286,19 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  GET /api/dashboard/summary                                  │
+│  GET /api/dashboard/summary?from=2026-04-01&to=2026-04-08   │
 │                                                              │
 │  Response:                                                   │
 │  {                                                           │
-│    promoters: [                                              │
+│    agents: [                                                 │
 │      {                                                       │
-│        promoterId: "...",                                    │
+│        agentId: "...",                                       │
 │        name: "Juan Pérez",                                   │
 │        totalCalls: 85,                                       │
+│        answered: 42,                                         │
+│        notAnswered: 43,                                      │
+│        avgCallDurationSeconds: 145,                          │
+│        uniqueClientsContacted: 60,                           │
 │        outcomes: {                                           │
 │          interested: 12,                                     │
 │          notInterested: 30,                                  │
@@ -323,38 +335,45 @@
 ```
 ┌──────────────┐         ┌──────────────────┐         ┌─────────────────┐
 │              │   1:N   │                  │   1:N   │                 │
-│     User     │◄────────│     Client       │◄────────│  Interaction    │
-│  (Admin /    │         │                  │         │                 │
-│   Promoter)  │         │  assignedTo ─────┼──► User │  clientId ──────┼──► Client
-│              │         │  status          │         │  promoterId ────┼──► User
+│    Agent     │◄────────│     Client       │◄────────│  Interaction    │
+│              │         │                  │         │                 │
+│              │         │  assignedTo ─────┼──► Agent│  clientId ──────┼──► Client
+│              │         │  status          │         │  agentId ───────┼──► Agent
 │              │         │  callAttempts    │         │  outcome        │
-│              │         │  lastOutcome     │         │  note           │
-│              │         │  lastNote        │         │  mobileSyncId   │
-│              │         │  extraData       │         │  disconnectCause│
+│              │         │  lastOutcome     │         │  mobileSyncId   │
+│              │         │  lastNote        │         │  disconnectCause│
+│              │         │  extraData       │         │                 │
 │              │         │  uploadBatchId   │         │                 │
 └──────┬───────┘         └────────┬─────────┘         └────────┬────────┘
        │                          │                            │
        │                          │  1:N                       │ 0..1
        │                          │                            │
        │                          ▼                            ▼
-       │                   ┌─────────────────┐
-       │             1:N   │    FollowUp     │
-       └──────────────────►│                 │
-                           │  clientId ──────┼──► Client
-                           │  promoterId ────┼──► User
-                           │  interactionId ─┼──► Interaction
-                           │  scheduledAt    │
-                           │  reason         │
-                           │  status         │
-                           │  mobileSyncId   │
+       │                   ┌─────────────────┐         ┌─────────────────┐
+       │             1:N   │    FollowUp     │         │      Note       │
+       ├──────────────────►│                 │         │                 │
+       │                   │  clientId ──────┼──► Client│  clientId ─────┼──► Client
+       │                   │  agentId ───────┼──► Agent │  agentId ──────┼──► Agent
+       │                   │  interactionId ─┼──► Inter.│  interactionId ┼──► Inter.
+       │                   │  scheduledAt    │         │  content        │
+       │             1:N   │  reason         │         │  type           │
+       └──────────────────►│  status         │         │  mobileSyncId   │
+                           │  mobileSyncId   │         └─────────────────┘
                            └─────────────────┘
 
-One Promoter  ──── has many ────  Clients assigned
+┌──────────────┐
+│    Admin     │  Separate collection for administrators
+│              │  (authenticated independently)
+└──────────────┘
+
+One Agent     ──── has many ────  Clients assigned
 One Client    ──── has many ────  Interactions (call history)
+One Client    ──── has many ────  Notes (note history)
 One Client    ──── has many ────  FollowUps (scheduled callbacks)
-One Promoter  ──── has many ────  Interactions (calls made)
-One Promoter  ──── has many ────  FollowUps (personal agenda)
-One Interaction ── has one ─────  note (optional free-text)
+One Agent     ──── has many ────  Interactions (calls made)
+One Agent     ──── has many ────  Notes (notes written)
+One Agent     ──── has many ────  FollowUps (personal agenda)
+One Interaction ── can have ────  many Notes (CALL, POST_CALL types)
 One Interaction ── can have ────  one FollowUp (if outcome = INTERESTED)
 One FollowUp  ──── links to ────  one Interaction (that originated it)
 ```
