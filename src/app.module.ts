@@ -13,6 +13,7 @@ import { FollowUpsModule } from '@/follow-ups/follow-ups.module';
 import { NotesModule } from '@/notes/notes.module';
 import { SyncModule } from '@/sync/sync.module';
 import { DashboardModule } from '@/dashboard/dashboard.module';
+import { HealthModule } from '@/health/health.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { DashboardModule } from '@/dashboard/dashboard.module';
     NotesModule,
     SyncModule,
     DashboardModule,
+    HealthModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
