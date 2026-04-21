@@ -1,0 +1,477 @@
+{
+  "info": {
+    "_postman_id": "3f9a2b7c-1e4d-4a88-b6c1-panama-calls-core",
+    "name": "Panama Calls Core API",
+    "description": "Complete endpoint suite for the panama-calls-core NestJS API.\n\n## Setup\n1. Set the collection variable `baseUrl` (default: http://localhost:3000)\n2. Run **Auth → Login** with valid credentials — the response's `accessToken` is auto-saved to the `accessToken` collection variable\n3. All protected requests use `Bearer {{accessToken}}` automatically via collection-level auth\n\n## Auth scheme\nJWT Bearer. Header: `Authorization: Bearer <token>`.\n\n## Global prefix\nAll routes live under `/api` EXCEPT `/health`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{accessToken}}", "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "agentId", "value": "", "type": "string" },
+    { "key": "clientId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Healthcheck",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Liveness + MongoDB connection state. Used by Railway healthcheck."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "const token = res?.data?.accessToken ?? res?.accessToken;",
+                  "if (token) {",
+                  "  pm.collectionVariables.set('accessToken', token);",
+                  "  console.log('accessToken saved to collection variable');",
+                  "} else {",
+                  "  console.warn('No accessToken in response');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"ChangeMe123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Public. Returns `{ accessToken }`. The test script stores it into `{{accessToken}}`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admins",
+      "item": [
+        {
+          "name": "List admins",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admins",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admins"]
+            },
+            "description": "Roles: ADMIN."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Agents",
+      "item": [
+        {
+          "name": "Create agent",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Agent\",\n  \"email\": \"agent@example.com\",\n  \"password\": \"StrongPass123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agents"]
+            },
+            "description": "Roles: ADMIN. Body: CreateAgentDto { name, email, password (min 8) }."
+          }
+        },
+        {
+          "name": "List agents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/agents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agents"]
+            },
+            "description": "Roles: ADMIN."
+          }
+        },
+        {
+          "name": "Get agent by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/agents/{{agentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agents", "{{agentId}}"]
+            },
+            "description": "Roles: ADMIN."
+          }
+        },
+        {
+          "name": "Update agent",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Renamed\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agents/{{agentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agents", "{{agentId}}"]
+            },
+            "description": "Roles: ADMIN. Body: UpdateAgentDto (all optional): { name?, password? (min 8), isActive? }."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Clients",
+      "item": [
+        {
+          "name": "Upload clients (Excel)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": [] }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients", "upload"]
+            },
+            "description": "Roles: ADMIN. Multipart form-data. Field name: `file`. Select an .xlsx file."
+          }
+        },
+        {
+          "name": "List clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients"],
+              "query": [
+                { "key": "status", "value": "PENDING", "disabled": true, "description": "PENDING | INTERESTED | CONVERTED | REJECTED | INVALID_NUMBER | DO_NOT_CALL" },
+                { "key": "assignedTo", "value": "", "disabled": true, "description": "Agent MongoId" },
+                { "key": "uploadBatchId", "value": "", "disabled": true },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Roles: ADMIN. Query: ClientFilterDto (all optional)."
+          }
+        },
+        {
+          "name": "List interested clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/interested",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients", "interested"],
+              "query": [
+                { "key": "agentId", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Roles: ADMIN. Query: agentId? (string)."
+          }
+        },
+        {
+          "name": "List assigned to me (agent)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/assigned",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients", "assigned"],
+              "query": [
+                { "key": "status", "value": "PENDING", "disabled": true }
+              ]
+            },
+            "description": "Roles: AGENT. Returns clients assigned to the authenticated agent."
+          }
+        },
+        {
+          "name": "Assign clients to agent",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agentId\": \"{{agentId}}\",\n  \"clientIds\": [\"{{clientId}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/assign",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients", "assign"]
+            },
+            "description": "Roles: ADMIN. Body: AssignClientsDto { agentId, clientIds[] }."
+          }
+        },
+        {
+          "name": "Update client status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"INTERESTED\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients", "{{clientId}}", "status"]
+            },
+            "description": "Roles: ADMIN. Body: UpdateClientStatusDto { status: ClientStatus }."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dashboard", "summary"],
+              "query": [
+                { "key": "from", "value": "2025-01-01", "disabled": true },
+                { "key": "to", "value": "2025-12-31", "disabled": true }
+              ]
+            },
+            "description": "Roles: ADMIN. Query: from?, to? (ISO date)."
+          }
+        },
+        {
+          "name": "Agent dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard/agent/{{agentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dashboard", "agent", "{{agentId}}"],
+              "query": [
+                { "key": "from", "value": "2025-01-01", "disabled": true },
+                { "key": "to", "value": "2025-12-31", "disabled": true }
+              ]
+            },
+            "description": "Roles: ADMIN."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notes",
+      "item": [
+        {
+          "name": "Notes by client",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notes/client/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notes", "client", "{{clientId}}"]
+            },
+            "description": "Roles: ADMIN."
+          }
+        },
+        {
+          "name": "Notes by agent",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notes/agent/{{agentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notes", "agent", "{{agentId}}"]
+            },
+            "description": "Roles: ADMIN."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Follow-ups",
+      "item": [
+        {
+          "name": "List (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/follow-ups",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "follow-ups"],
+              "query": [
+                { "key": "agentId", "value": "", "disabled": true },
+                { "key": "clientId", "value": "", "disabled": true },
+                { "key": "status", "value": "PENDING", "disabled": true, "description": "PENDING | COMPLETED | CANCELLED" },
+                { "key": "from", "value": "", "disabled": true },
+                { "key": "to", "value": "", "disabled": true },
+                { "key": "page", "value": "1", "disabled": true },
+                { "key": "limit", "value": "20", "disabled": true }
+              ]
+            },
+            "description": "Roles: ADMIN. Query: FollowUpFilterDto (all optional)."
+          }
+        },
+        {
+          "name": "Agent agenda",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/follow-ups/agenda",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "follow-ups", "agenda"],
+              "query": [
+                { "key": "from", "value": "", "disabled": true },
+                { "key": "to", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Roles: AGENT. Returns agenda for the authenticated agent."
+          }
+        },
+        {
+          "name": "By agent",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/follow-ups/agent/{{agentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "follow-ups", "agent", "{{agentId}}"]
+            },
+            "description": "Roles: ADMIN."
+          }
+        },
+        {
+          "name": "By client",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/follow-ups/client/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "follow-ups", "client", "{{clientId}}"]
+            },
+            "description": "Roles: ADMIN."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Interactions",
+      "item": [
+        {
+          "name": "List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/interactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "interactions"],
+              "query": [
+                { "key": "agentId", "value": "", "disabled": true },
+                { "key": "clientId", "value": "", "disabled": true },
+                { "key": "outcome", "value": "INTERESTED", "disabled": true, "description": "INTERESTED | NOT_INTERESTED | NO_ANSWER | BUSY | INVALID_NUMBER" },
+                { "key": "from", "value": "", "disabled": true },
+                { "key": "to", "value": "", "disabled": true },
+                { "key": "page", "value": "1", "disabled": true },
+                { "key": "limit", "value": "20", "disabled": true }
+              ]
+            },
+            "description": "Roles: ADMIN. Query: InteractionFilterDto (all optional)."
+          }
+        },
+        {
+          "name": "By client",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/interactions/client/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "interactions", "client", "{{clientId}}"]
+            },
+            "description": "Roles: ADMIN."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sync (mobile agent)",
+      "item": [
+        {
+          "name": "Sync batch",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"interactions\": [\n    {\n      \"mobileSyncId\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"clientId\": \"{{clientId}}\",\n      \"callStartedAt\": \"2025-04-20T14:00:00.000Z\",\n      \"callEndedAt\": \"2025-04-20T14:03:20.000Z\",\n      \"durationSeconds\": 200,\n      \"outcome\": \"INTERESTED\",\n      \"disconnectCause\": \"USER_ENDED\",\n      \"deviceCreatedAt\": \"2025-04-20T14:03:21.000Z\"\n    }\n  ],\n  \"followUps\": [\n    {\n      \"mobileSyncId\": \"660e8400-e29b-41d4-a716-446655440001\",\n      \"clientId\": \"{{clientId}}\",\n      \"interactionMobileSyncId\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"scheduledAt\": \"2025-04-22T15:00:00.000Z\",\n      \"reason\": \"Client asked to call back on Tuesday\",\n      \"deviceCreatedAt\": \"2025-04-20T14:03:22.000Z\"\n    }\n  ],\n  \"completedFollowUps\": [\n    {\n      \"mobileSyncId\": \"770e8400-e29b-41d4-a716-446655440002\",\n      \"completedAt\": \"2025-04-20T14:05:00.000Z\"\n    }\n  ],\n  \"notes\": [\n    {\n      \"mobileSyncId\": \"880e8400-e29b-41d4-a716-446655440003\",\n      \"clientId\": \"{{clientId}}\",\n      \"interactionMobileSyncId\": \"550e8400-e29b-41d4-a716-446655440000\",\n      \"content\": \"Client confirmed interest, wants product X\",\n      \"type\": \"POST_CALL\",\n      \"deviceCreatedAt\": \"2025-04-20T14:04:00.000Z\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sync/interactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sync", "interactions"]
+            },
+            "description": "Roles: AGENT. Body: SyncRequestDto. All four arrays are optional — send only what needs syncing.\n\nEnums:\n- CallOutcome: INTERESTED, NOT_INTERESTED, NO_ANSWER, BUSY, INVALID_NUMBER\n- NoteType: CALL, POST_CALL, MANUAL, FOLLOW_UP"
+          }
+        }
+      ]
+    }
+  ]
+}
