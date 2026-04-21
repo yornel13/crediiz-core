@@ -4,7 +4,7 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                     OWNER PANEL (Web)                         │
+│                     OWNER PANEL (Web)                        │
 │                                                              │
 │  1. Owner logs in (POST /api/auth/login)                     │
 │         │                                                    │
