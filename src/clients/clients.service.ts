@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { type Model, type Types } from 'mongoose';
 import { CallOutcome, ClientStatus } from '@/common/enums';
 import { FollowUpsService } from '@/follow-ups/follow-ups.service';
+import { normalizePhone } from '@/common/utils';
 import { Client, type ClientDocument } from './schemas/client.schema';
 import { type AssignClientsDto } from './dto/assign-clients.dto';
 import { type ClientFilterDto } from './dto/client-filter.dto';
@@ -10,6 +11,9 @@ import { type ClientFilterDto } from './dto/client-filter.dto';
 interface ClientInput {
   name: string;
   phone: string;
+  cedula?: string | null;
+  ssNumber?: string | null;
+  salary?: number | null;
   extraData?: Record<string, unknown> | undefined;
 }
 
@@ -45,6 +49,10 @@ export class ClientsService {
     const docs = clients.map((client, index) => ({
       name: client.name,
       phone: client.phone,
+      phoneNormalized: normalizePhone(client.phone),
+      cedula: client.cedula ?? null,
+      ssNumber: client.ssNumber ?? null,
+      salary: client.salary ?? null,
       extraData: client.extraData ?? {},
       uploadBatchId,
       queueOrder: index,

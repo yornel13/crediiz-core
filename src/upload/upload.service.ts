@@ -7,6 +7,9 @@ import { type ClientDocument } from '@/clients/schemas/client.schema';
 interface ParsedClient {
   name: string;
   phone: string;
+  cedula: string | null;
+  ssNumber: string | null;
+  salary: number | null;
   extraData: Record<string, unknown>;
 }
 
@@ -15,6 +18,24 @@ interface ImportResult {
   count: number;
   clients: ClientDocument[];
 }
+
+/** Header alias map: lower-cased Excel column header -> canonical field name. */
+const HEADER_ALIASES: Record<string, keyof ParsedClient> = {
+  name: 'name',
+  nombre: 'name',
+  phone: 'phone',
+  telefono: 'phone',
+  teléfono: 'phone',
+  celular: 'phone',
+  cedula: 'cedula',
+  cédula: 'cedula',
+  ss: 'ssNumber',
+  's.s': 'ssNumber',
+  'seguro social': 'ssNumber',
+  ssnumber: 'ssNumber',
+  salary: 'salary',
+  salario: 'salary',
+};
 
 function cellToString(value: CellValue): string {
   if (value == null) return '';
@@ -25,6 +46,13 @@ function cellToString(value: CellValue): string {
   if (typeof value === 'object' && 'result' in value)
     return cellToString(value.result as CellValue);
   return '';
+}
+
+function parseSalary(raw: string): number | null {
+  const cleaned = raw.replace(/[^\d.-]/g, '');
+  if (cleaned === '') return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 @Injectable()
@@ -41,22 +69,23 @@ export class UploadService {
     }
 
     const headerRow = worksheet.getRow(1);
-    const headers: string[] = [];
+    /** colIndex -> canonical field name (if recognized), else raw header for extraData */
+    const colMap: { canonical: keyof ParsedClient | undefined; raw: string }[] = [];
 
     headerRow.eachCell((cell, colNumber) => {
-      headers[colNumber] = cellToString(cell.value).toLowerCase().trim();
+      const raw = cellToString(cell.value).toLowerCase().trim();
+      colMap[colNumber] = { canonical: HEADER_ALIASES[raw], raw };
     });
 
-    const nameCol = headers.findIndex((h) => h === 'name' || h === 'nombre');
-    const phoneCol = headers.findIndex(
-      (h) => h === 'phone' || h === 'telefono' || h === 'teléfono',
-    );
-
-    if (nameCol === -1) {
+    const hasName = colMap.some((c) => c?.canonical === 'name');
+    const hasPhone = colMap.some((c) => c?.canonical === 'phone');
+    if (!hasName) {
       throw new BadRequestException('Excel file must contain a "name" or "nombre" column');
     }
-    if (phoneCol === -1) {
-      throw new BadRequestException('Excel file must contain a "phone" or "telefono" column');
+    if (!hasPhone) {
+      throw new BadRequestException(
+        'Excel file must contain a "phone", "telefono" or "celular" column',
+      );
     }
 
     const clients: ParsedClient[] = [];
@@ -64,22 +93,43 @@ export class UploadService {
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
 
-      const name = cellToString(row.getCell(nameCol).value).trim();
-      const phone = cellToString(row.getCell(phoneCol).value).trim();
-
-      if (name === '' || phone === '') return;
-
+      let name = '';
+      let phone = '';
+      let cedula: string | null = null;
+      let ssNumber: string | null = null;
+      let salary: number | null = null;
       const extraData: Record<string, unknown> = {};
-      for (const [colIndex, header] of headers.entries()) {
-        if (colIndex === 0 || colIndex === nameCol || colIndex === phoneCol || header === '')
-          continue;
-        const cellValue = row.getCell(colIndex).value;
-        if (cellValue != null) {
-          extraData[header] = typeof cellValue === 'object' ? cellToString(cellValue) : cellValue;
+
+      for (const [colIndex, meta] of colMap.entries()) {
+        if (!meta || meta.raw === '') continue;
+        const value = row.getCell(colIndex).value;
+        if (value == null) continue;
+        const str = cellToString(value).trim();
+        if (str === '') continue;
+
+        switch (meta.canonical) {
+          case 'name':
+            name = str;
+            break;
+          case 'phone':
+            phone = str;
+            break;
+          case 'cedula':
+            cedula = str;
+            break;
+          case 'ssNumber':
+            ssNumber = str;
+            break;
+          case 'salary':
+            salary = parseSalary(str);
+            break;
+          default:
+            extraData[meta.raw] = typeof value === 'object' ? str : value;
         }
       }
 
-      clients.push({ name, phone, extraData });
+      if (name === '' || phone === '') return;
+      clients.push({ name, phone, cedula, ssNumber, salary, extraData });
     });
 
     if (clients.length === 0) {

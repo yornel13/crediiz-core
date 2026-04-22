@@ -48,7 +48,43 @@ describe('UploadService', () => {
       expect(result[0]).toEqual({
         name: 'Alice',
         phone: '+5071234',
+        cedula: null,
+        ssNumber: null,
+        salary: null,
         extraData: { company: 'Acme Inc' },
+      });
+    });
+
+    it('should map cedula, ss and salary headers to flat fields', async () => {
+      const buffer = await createExcelBuffer(
+        ['Nombre', 'Celular', 'Cedula', 'S.S', 'Salario', 'Extra'],
+        [['Alice', '6680-1776', '8-123-456', '034-1234', 1200, 'note']],
+      );
+
+      const result = await service.parseExcel(buffer);
+
+      expect(result[0]).toEqual({
+        name: 'Alice',
+        phone: '6680-1776',
+        cedula: '8-123-456',
+        ssNumber: '034-1234',
+        salary: 1200,
+        extraData: { extra: 'note' },
+      });
+    });
+
+    it('should leave optional flat fields as null when columns absent', async () => {
+      const buffer = await createExcelBuffer(['Nombre', 'Celular'], [['Bob', '6680-1777']]);
+
+      const result = await service.parseExcel(buffer);
+
+      expect(result[0]).toEqual({
+        name: 'Bob',
+        phone: '6680-1777',
+        cedula: null,
+        ssNumber: null,
+        salary: null,
+        extraData: {},
       });
     });
 
