@@ -14,7 +14,7 @@ const mockClientModel = {
   findByIdAndUpdate: jest.fn(),
 };
 
-const chainable = (result: unknown) => ({
+const chainable = (result: unknown): Record<string, jest.Mock> => ({
   skip: jest.fn().mockReturnValue({
     limit: jest.fn().mockReturnValue({
       sort: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue(result) }),
@@ -45,30 +45,103 @@ describe('ClientsService', () => {
   });
 
   describe('bulkCreate', () => {
-    it('should insert clients with uploadBatchId and queueOrder', async () => {
+    it('should insert clients with flat fields, normalized phone, batch and queue order', async () => {
       const clients = [
-        { name: 'Alice', phone: '+5071234' },
-        { name: 'Bob', phone: '+5075678' },
+        { name: 'Alice', phone: '6680-1776', cedula: '8-1-1', ssNumber: '111', salary: 1200 },
+        { name: 'Bob', phone: '+507 6680-1777' },
       ];
       mockClientModel.insertMany.mockResolvedValue(clients);
 
-      await service.bulkCreate(clients, 'batch-123');
+      const result = await service.bulkCreate(clients, 'batch-123');
 
-      expect(mockClientModel.insertMany).toHaveBeenCalledWith([
-        expect.objectContaining({ name: 'Alice', uploadBatchId: 'batch-123', queueOrder: 0 }),
-        expect.objectContaining({ name: 'Bob', uploadBatchId: 'batch-123', queueOrder: 1 }),
+      expect(mockClientModel.insertMany).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            name: 'Alice',
+            phone: '6680-1776',
+            phoneNormalized: '50766801776',
+            cedula: '8-1-1',
+            ssNumber: '111',
+            salary: 1200,
+            uploadBatchId: 'batch-123',
+            queueOrder: 0,
+          }),
+          expect.objectContaining({
+            name: 'Bob',
+            phone: '+507 6680-1777',
+            phoneNormalized: '50766801777',
+            cedula: null,
+            ssNumber: null,
+            salary: null,
+            uploadBatchId: 'batch-123',
+            queueOrder: 1,
+          }),
+        ],
+        { ordered: false },
+      );
+      expect(result.rejected).toEqual([]);
+    });
+
+    it('should report rejected rows on duplicate-key errors instead of throwing', async () => {
+      const clients = [{ name: 'Alice', phone: '6680-1776', cedula: '8-1-1' }];
+      const bulkErr = {
+        writeErrors: [
+          {
+            index: 0,
+            code: 11000,
+            errmsg:
+              'E11000 duplicate key error collection: db.clients index: cedula_1 dup key: { cedula: "8-1-1" }',
+          },
+        ],
+        insertedDocs: [],
+      };
+      mockClientModel.insertMany.mockRejectedValue(bulkErr);
+
+      const result = await service.bulkCreate(clients, 'batch-x');
+
+      expect(result.inserted).toEqual([]);
+      expect(result.rejected).toEqual([
+        { index: 0, field: 'cedula', value: '8-1-1', reason: 'duplicate' },
       ]);
     });
   });
 
   describe('findAll', () => {
     it('should return paginated results with default values', async () => {
-      mockClientModel.find.mockReturnValue(chainable([{ name: 'Alice' }]));
+      mockClientModel.find.mockReturnValue({
+        populate: jest.fn().mockReturnValue({
+          skip: jest.fn().mockReturnValue({
+            limit: jest.fn().mockReturnValue({
+              sort: jest.fn().mockReturnValue({
+                exec: jest.fn().mockResolvedValue([{ name: 'Alice' }]),
+              }),
+            }),
+          }),
+        }),
+      });
       mockClientModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
 
       const result = await service.findAll({});
 
       expect(result).toEqual({ data: [{ name: 'Alice' }], total: 1, page: 1, limit: 50 });
+    });
+
+    it('should build a search $or against name, cedula, ssNumber and phoneNormalized', async () => {
+      const populate = jest.fn().mockReturnValue({
+        skip: jest.fn().mockReturnValue({
+          limit: jest.fn().mockReturnValue({
+            sort: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([]) }),
+          }),
+        }),
+      });
+      mockClientModel.find.mockReturnValue({ populate });
+      mockClientModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(0) });
+
+      await service.findAll({ search: '6680' });
+
+      const calls = mockClientModel.find.mock.calls as [Record<string, unknown>][];
+      const queryArg = calls[0]?.[0] as { $or: unknown[] };
+      expect(queryArg.$or).toHaveLength(4);
     });
   });
 

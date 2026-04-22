@@ -180,7 +180,24 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "clients", "upload"]
             },
-            "description": "Roles: ADMIN. Multipart form-data. Field name: `file`. Select an .xlsx file."
+            "description": "Roles: ADMIN. Multipart form-data. Field name: `file`. Select an .xlsx file.\n\n## Recognized headers (case-insensitive)\nFlat fields:\n- `name` | `nombre` (required)\n- `phone` | `telefono` | `teléfono` | `celular` (required)\n- `cedula` | `cédula` (optional)\n- `ss` | `s.s` | `seguro social` | `ssNumber` (optional)\n- `salary` | `salario` (optional)\n\nAny other column is preserved into `extraData`.\n\n## Response\n```json\n{\n  \"uploadBatchId\": \"<uuid>\",\n  \"insertedCount\": 348,\n  \"rejectedCount\": 1,\n  \"rejected\": [{ \"index\": 7, \"field\": \"cedula\", \"value\": \"8-1-1\", \"reason\": \"duplicate\" }]\n}\n```\nDuplicates on `cedula` or `ssNumber` do not abort the batch — they are reported in `rejected`."
+          }
+        },
+        {
+          "name": "Create client",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"María González\",\n  \"phone\": \"+507 6680-1776\",\n  \"cedula\": \"8-123-456\",\n  \"ssNumber\": \"034-1234\",\n  \"salary\": 1200,\n  \"extraData\": { \"bank\": \"Banco General\" }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients"]
+            },
+            "description": "Roles: ADMIN. Body: CreateClientDto. Required: `name`, `phone`. Optional: `cedula`, `ssNumber`, `salary`, `extraData`. Returns 409 if `cedula` or `ssNumber` already exist."
           }
         },
         {
@@ -196,11 +213,25 @@
                 { "key": "status", "value": "PENDING", "disabled": true, "description": "PENDING | INTERESTED | CONVERTED | REJECTED | INVALID_NUMBER | DO_NOT_CALL" },
                 { "key": "assignedTo", "value": "", "disabled": true, "description": "Agent MongoId" },
                 { "key": "uploadBatchId", "value": "", "disabled": true },
+                { "key": "search", "value": "", "disabled": true, "description": "Free-text — matches name, cedula, ssNumber and phoneNormalized (digits-only)" },
                 { "key": "page", "value": "1" },
                 { "key": "limit", "value": "20" }
               ]
             },
-            "description": "Roles: ADMIN. Query: ClientFilterDto (all optional)."
+            "description": "Roles: ADMIN. Query: ClientFilterDto (all optional). `assignedTo` is populated with `{ name, email }` in the response."
+          }
+        },
+        {
+          "name": "Get client by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients", "{{clientId}}"]
+            },
+            "description": "Roles: ADMIN. Returns the full client document with `assignedTo` populated."
           }
         },
         {
@@ -250,6 +281,23 @@
               "path": ["api", "clients", "assign"]
             },
             "description": "Roles: ADMIN. Body: AssignClientsDto { agentId, clientIds[] }."
+          }
+        },
+        {
+          "name": "Update client",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"María González Pérez\",\n  \"phone\": \"+507 6680-1799\",\n  \"cedula\": \"8-123-456\",\n  \"ssNumber\": \"034-1234\",\n  \"salary\": 1500,\n  \"extraData\": { \"bank\": \"Banco General\" }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients", "{{clientId}}"]
+            },
+            "description": "Roles: ADMIN. Body: UpdateClientDto (all fields optional). Updating `phone` recomputes `phoneNormalized` server-side. Returns 409 if `cedula` or `ssNumber` collide with another client."
           }
         },
         {

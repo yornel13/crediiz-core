@@ -34,14 +34,16 @@ export class FollowUpsService {
 
   async findAll(filter: FollowUpFilterDto): Promise<PaginatedResult<FollowUpDocument>> {
     const query: Record<string, unknown> = {};
-    if (filter.agentId) query.agentId = filter.agentId;
-    if (filter.status) query.status = filter.status;
-    if (filter.clientId) query.clientId = filter.clientId;
+    if (filter.agentId !== undefined && filter.agentId !== '') query.agentId = filter.agentId;
+    if (filter.status !== undefined) query.status = filter.status;
+    if (filter.clientId !== undefined && filter.clientId !== '') query.clientId = filter.clientId;
 
-    if (filter.from || filter.to) {
+    const fromStr = filter.from !== undefined && filter.from !== '' ? filter.from : null;
+    const toStr = filter.to !== undefined && filter.to !== '' ? filter.to : null;
+    if (fromStr !== null || toStr !== null) {
       const dateQuery: Record<string, unknown> = {};
-      if (filter.from) dateQuery.$gte = new Date(filter.from);
-      if (filter.to) dateQuery.$lte = new Date(filter.to);
+      if (fromStr !== null) dateQuery.$gte = new Date(fromStr);
+      if (toStr !== null) dateQuery.$lte = new Date(toStr);
       query.scheduledAt = dateQuery;
     }
 
@@ -52,7 +54,7 @@ export class FollowUpsService {
     const [data, total] = await Promise.all([
       this.followUpModel
         .find(query)
-        .populate('clientId', 'name phone')
+        .populate('clientId', 'name phone phoneNormalized cedula ssNumber salary')
         .skip(skip)
         .limit(limit)
         .sort({ scheduledAt: 1 })
@@ -66,7 +68,7 @@ export class FollowUpsService {
   async findByAgent(agentId: string): Promise<FollowUpDocument[]> {
     return this.followUpModel
       .find({ agentId })
-      .populate('clientId', 'name phone')
+      .populate('clientId', 'name phone phoneNormalized cedula ssNumber salary')
       .sort({ scheduledAt: 1 })
       .exec();
   }
@@ -82,19 +84,22 @@ export class FollowUpsService {
     };
 
     const dateQuery: Record<string, unknown> = {};
-    if (from) {
+    if (from !== undefined && from !== '') {
       dateQuery.$gte = new Date(from);
     } else {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       dateQuery.$gte = today;
     }
-    if (to) dateQuery.$lte = new Date(to);
+    if (to !== undefined && to !== '') dateQuery.$lte = new Date(to);
     query.scheduledAt = dateQuery;
 
     return this.followUpModel
       .find(query)
-      .populate('clientId', 'name phone extraData callAttempts lastOutcome lastNote')
+      .populate(
+        'clientId',
+        'name phone phoneNormalized cedula ssNumber salary extraData callAttempts lastOutcome lastNote',
+      )
       .sort({ scheduledAt: 1 })
       .exec();
   }

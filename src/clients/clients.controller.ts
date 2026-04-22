@@ -14,10 +14,12 @@ import { Role, type ClientStatus } from '@/common/enums';
 import { Roles } from '@/auth/decorators/roles.decorator';
 import { CurrentUser } from '@/auth/decorators/current-user.decorator';
 import { type AuthenticatedUser } from '@/auth/interfaces/jwt-payload.interface';
-import { UploadService } from '@/upload/upload.service';
+import { UploadService, type UploadImportResult } from '@/upload/upload.service';
 import { ClientsService } from './clients.service';
 import { AssignClientsDto } from './dto/assign-clients.dto';
 import { ClientFilterDto } from './dto/client-filter.dto';
+import { CreateClientDto } from './dto/create-client.dto';
+import { UpdateClientDto } from './dto/update-client.dto';
 import { UpdateClientStatusDto } from './dto/update-client-status.dto';
 import { type ClientDocument } from './schemas/client.schema';
 
@@ -31,11 +33,14 @@ export class ClientsController {
   @Post('upload')
   @Roles(Role.ADMIN)
   @UseInterceptors(FileInterceptor('file'))
-  async upload(
-    @UploadedFile() file: Express.Multer.File,
-  ): Promise<{ uploadBatchId: string; count: number }> {
-    const result = await this.uploadService.importClients(file);
-    return { uploadBatchId: result.uploadBatchId, count: result.count };
+  async upload(@UploadedFile() file: Express.Multer.File): Promise<UploadImportResult> {
+    return this.uploadService.importClients(file);
+  }
+
+  @Post()
+  @Roles(Role.ADMIN)
+  async create(@Body() dto: CreateClientDto): Promise<ClientDocument> {
+    return this.clientsService.create(dto);
   }
 
   @Get()
@@ -64,10 +69,22 @@ export class ClientsController {
     return this.clientsService.findAssigned(user.userId, status);
   }
 
+  @Get(':id')
+  @Roles(Role.ADMIN)
+  async findOne(@Param('id') id: string): Promise<ClientDocument> {
+    return this.clientsService.findOne(id);
+  }
+
   @Patch('assign')
   @Roles(Role.ADMIN)
   async assignClients(@Body() dto: AssignClientsDto): Promise<{ modifiedCount: number }> {
     return this.clientsService.assignClients(dto);
+  }
+
+  @Patch(':id')
+  @Roles(Role.ADMIN)
+  async update(@Param('id') id: string, @Body() dto: UpdateClientDto): Promise<ClientDocument> {
+    return this.clientsService.update(id, dto);
   }
 
   @Patch(':id/status')

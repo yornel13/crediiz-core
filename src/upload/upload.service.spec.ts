@@ -134,19 +134,37 @@ describe('UploadService', () => {
   });
 
   describe('importClients', () => {
-    it('should generate uploadBatchId and call bulkCreate', async () => {
+    it('should generate uploadBatchId and report inserted/rejected counts', async () => {
       const buffer = await createExcelBuffer(['Name', 'Phone'], [['Alice', '+507111']]);
-      clientsService.bulkCreate.mockResolvedValue([{ name: 'Alice' }]);
+      clientsService.bulkCreate.mockResolvedValue({
+        inserted: [{ name: 'Alice' }],
+        rejected: [],
+      });
 
       const file = { buffer } as Express.Multer.File;
       const result = await service.importClients(file);
 
       expect(result.uploadBatchId).toBeDefined();
-      expect(result.count).toBe(1);
+      expect(result.insertedCount).toBe(1);
+      expect(result.rejectedCount).toBe(0);
       expect(clientsService.bulkCreate).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ name: 'Alice' })]),
         expect.any(String),
       );
+    });
+
+    it('should surface rejected rows from bulkCreate', async () => {
+      const buffer = await createExcelBuffer(['Name', 'Phone'], [['Alice', '+507111']]);
+      clientsService.bulkCreate.mockResolvedValue({
+        inserted: [],
+        rejected: [{ index: 0, field: 'cedula', value: '8-1-1', reason: 'duplicate' }],
+      });
+
+      const result = await service.importClients({ buffer } as Express.Multer.File);
+
+      expect(result.insertedCount).toBe(0);
+      expect(result.rejectedCount).toBe(1);
+      expect(result.rejected[0]?.field).toBe('cedula');
     });
   });
 });

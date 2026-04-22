@@ -1,8 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { type CellValue, Workbook } from 'exceljs';
-import { ClientsService } from '@/clients/clients.service';
-import { type ClientDocument } from '@/clients/schemas/client.schema';
+import { ClientsService, type BulkRejectedRow } from '@/clients/clients.service';
 
 interface ParsedClient {
   name: string;
@@ -13,10 +12,11 @@ interface ParsedClient {
   extraData: Record<string, unknown>;
 }
 
-interface ImportResult {
+export interface UploadImportResult {
   uploadBatchId: string;
-  count: number;
-  clients: ClientDocument[];
+  insertedCount: number;
+  rejectedCount: number;
+  rejected: BulkRejectedRow[];
 }
 
 /** Header alias map: lower-cased Excel column header -> canonical field name. */
@@ -69,8 +69,15 @@ export class UploadService {
     }
 
     const headerRow = worksheet.getRow(1);
-    /** colIndex -> canonical field name (if recognized), else raw header for extraData */
-    const colMap: { canonical: keyof ParsedClient | undefined; raw: string }[] = [];
+    /**
+     * colIndex -> { canonical field, raw header }. Element may be `undefined`
+     * because we assign by `colNumber`, leaving sparse holes in the array.
+     */
+    interface HeaderMeta {
+      canonical: keyof ParsedClient | undefined;
+      raw: string;
+    }
+    const colMap: (HeaderMeta | undefined)[] = [];
 
     headerRow.eachCell((cell, colNumber) => {
       const raw = cellToString(cell.value).toLowerCase().trim();
@@ -101,7 +108,7 @@ export class UploadService {
       const extraData: Record<string, unknown> = {};
 
       for (const [colIndex, meta] of colMap.entries()) {
-        if (!meta || meta.raw === '') continue;
+        if (meta === undefined || meta.raw === '') continue;
         const value = row.getCell(colIndex).value;
         if (value == null) continue;
         const str = cellToString(value).trim();
@@ -139,15 +146,19 @@ export class UploadService {
     return clients;
   }
 
-  async importClients(file: Express.Multer.File): Promise<ImportResult> {
+  async importClients(file: Express.Multer.File): Promise<UploadImportResult> {
     const uploadBatchId = randomUUID();
     const parsedClients = await this.parseExcel(file.buffer);
-    const clients = await this.clientsService.bulkCreate(parsedClients, uploadBatchId);
+    const { inserted, rejected } = await this.clientsService.bulkCreate(
+      parsedClients,
+      uploadBatchId,
+    );
 
     return {
       uploadBatchId,
-      count: clients.length,
-      clients,
+      insertedCount: inserted.length,
+      rejectedCount: rejected.length,
+      rejected,
     };
   }
 }
